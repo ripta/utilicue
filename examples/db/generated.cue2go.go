@@ -3,14 +3,14 @@
 package db
 
 type Identity struct {
-	First string
+	First  string
 	Middle string
-	Last string
-	Nick string
+	Last   string
+	Nick   string
 }
 
 type Person struct {
 	Title string
-	Name Identity
-	Age int
+	Name  Identity
+	Age   int
 }

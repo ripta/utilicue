@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"go/format"
 	"io/fs"
 	"log"
 	"os"
@@ -85,7 +86,12 @@ func (gen *Generator) Run(args []string) error {
 			valueToGo(buf, it.Selector(), v)
 		}
 
-		if err := os.WriteFile(filepath.Join(abs, "generated.cue2go.go"), buf.Bytes(), 0644); err != nil {
+		src, err := format.Source(buf.Bytes())
+		if err != nil {
+			return fmt.Errorf("error formatting output: %w", err)
+		}
+
+		if err := os.WriteFile(filepath.Join(abs, "generated.cue2go.go"), src, 0644); err != nil {
 			return fmt.Errorf("error writing output file: %w", err)
 		}
 	}
