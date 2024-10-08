@@ -82,7 +82,7 @@ func (gen *Generator) Run(args []string) error {
 			if !it.Selector().IsDefinition() || v.IncompleteKind() != cue.StructKind {
 				continue
 			}
-			structToType(buf, it.Selector(), it.Value())
+			valueToGo(buf, it.Selector(), v)
 		}
 
 		if err := os.WriteFile(filepath.Join(abs, "generated.cue2go.go"), buf.Bytes(), 0644); err != nil {
@@ -93,6 +93,24 @@ func (gen *Generator) Run(args []string) error {
 	return nil
 }
 
+func valueToGo(buf *bytes.Buffer, name cue.Selector, val cue.Value) {
+	switch k := val.IncompleteKind(); k {
+	case cue.StringKind, cue.IntKind, cue.FloatKind, cue.BoolKind:
+		fmt.Fprintf(buf, "\t%v %v\n", name.Unquoted(), val.IncompleteKind())
+
+	case cue.StructKind:
+		if _, i := val.ReferencePath(); len(i.Selectors()) > 0 {
+			fmt.Fprintf(buf, "\t%v %v\n", name.Unquoted(), strings.TrimPrefix(i.String(), "#"))
+			return
+		}
+
+		structToType(buf, name, val)
+
+	default:
+		panic(fmt.Sprintf("unexpected kind %v at path %v", k, val.Path().String()))
+	}
+}
+
 // structToType prints the top-level fields of a struct value
 func structToType(buf *bytes.Buffer, name cue.Selector, val cue.Value) {
 	fmt.Fprintf(buf, "\ntype %v struct {\n", strings.TrimPrefix(name.String(), "#"))
@@ -100,21 +118,7 @@ func structToType(buf *bytes.Buffer, name cue.Selector, val cue.Value) {
 	// Iterate through the fields of the struct
 	it, _ := val.Fields(cue.Optional(true))
 	for it.Next() {
-		v := it.Value()
-		switch k := v.IncompleteKind(); k {
-
-		case cue.StringKind, cue.IntKind, cue.FloatKind, cue.BoolKind:
-			fmt.Fprintf(buf, "\t%v %v\n", it.Selector().Unquoted(), v.IncompleteKind())
-
-		case cue.StructKind:
-			_, i := v.ReferencePath()
-			if len(i.Selectors()) > 0 {
-				fmt.Fprintf(buf, "\t%v %v\n", it.Selector().Unquoted(), strings.TrimPrefix(i.String(), "#"))
-			}
-
-		default:
-			panic(fmt.Sprintf("unexpected kind %v at path %v", k, v.Path().String()))
-		}
+		valueToGo(buf, it.Selector(), it.Value())
 	}
 
 	fmt.Fprintf(buf, "}\n")
