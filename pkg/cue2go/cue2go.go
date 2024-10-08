@@ -80,7 +80,7 @@ func (gen *Generator) Run(args []string) error {
 
 		for it.Next() {
 			v := it.Value()
-			if !it.Selector().IsDefinition() || v.IncompleteKind() != cue.StructKind {
+			if !it.Selector().IsDefinition() {
 				continue
 			}
 			valueToGo(buf, it.Selector(), v)
@@ -112,19 +112,34 @@ func valueToGo(buf *bytes.Buffer, name cue.Selector, val cue.Value) {
 	}
 
 	switch k := val.IncompleteKind(); k {
+
 	case cue.StringKind, cue.IntKind, cue.FloatKind, cue.BoolKind:
-		fmt.Fprintf(buf, "\t%v %s%v\n", name.Unquoted(), ptr, val.IncompleteKind())
+		switch lt := name.LabelType(); lt {
+		case cue.DefinitionLabel:
+			fmt.Fprintf(buf, "type %v %v\n", strings.TrimPrefix(name.String(), "#"), val.IncompleteKind())
+		case cue.StringLabel:
+			fmt.Fprintf(buf, "\t%v %s%v\n", name.Unquoted(), ptr, val.IncompleteKind())
+		default:
+			panic(fmt.Sprintf("unsupported label type %v at path %v", lt, name.String()))
+		}
 
 	case cue.StructKind:
-		if _, i := val.ReferencePath(); len(i.Selectors()) > 0 {
-			fmt.Fprintf(buf, "\t%v %s%v\n", name.Unquoted(), ptr, strings.TrimPrefix(i.String(), "#"))
+		if _, p := val.ReferencePath(); len(p.Selectors()) > 0 {
+			fmt.Fprintf(buf, "\t%v %s%v\n", name.Unquoted(), ptr, strings.TrimPrefix(p.String(), "#"))
 			return
 		}
 
 		structToType(buf, name, val)
 
+	case cue.ListKind:
+		el := val.LookupPath(cue.MakePath(cue.AnyIndex))
+		if _, p := el.ReferencePath(); len(p.Selectors()) > 0 {
+			fmt.Fprintf(buf, "type %v []%v\n", strings.TrimPrefix(name.String(), "#"), strings.TrimPrefix(p.String(), "#"))
+			return
+		}
+
 	default:
-		panic(fmt.Sprintf("unexpected kind %v at path %v", k, val.Path().String()))
+		panic(fmt.Sprintf("unsupported kind %v at path %v", k, val.Path().String()))
 	}
 }
 
