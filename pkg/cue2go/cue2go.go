@@ -83,6 +83,7 @@ func (gen *Generator) Run(args []string) error {
 			if !it.Selector().IsDefinition() {
 				continue
 			}
+
 			valueToGo(buf, it.Selector(), v)
 		}
 
@@ -134,6 +135,8 @@ func valueToGo(buf *bytes.Buffer, name cue.Selector, val cue.Value) {
 	case cue.ListKind:
 		el := val.LookupPath(cue.MakePath(cue.AnyIndex))
 		if _, p := el.ReferencePath(); len(p.Selectors()) > 0 {
+			fmt.Fprint(buf, "\n")
+			copyComments(buf, val)
 			fmt.Fprintf(buf, "type %v []%v\n", strings.TrimPrefix(name.String(), "#"), strings.TrimPrefix(p.String(), "#"))
 			return
 		}
@@ -143,9 +146,21 @@ func valueToGo(buf *bytes.Buffer, name cue.Selector, val cue.Value) {
 	}
 }
 
+func copyComments(buf *bytes.Buffer, val cue.Value) {
+	if cgs := val.Doc(); len(cgs) > 0 {
+		for _, cg := range cgs {
+			for _, c := range cg.List {
+				fmt.Fprintf(buf, "%s\n", c.Text)
+			}
+		}
+	}
+}
+
 // structToType prints the top-level fields of a struct value
 func structToType(buf *bytes.Buffer, name cue.Selector, val cue.Value) {
-	fmt.Fprintf(buf, "\ntype %v struct {\n", strings.TrimPrefix(name.String(), "#"))
+	fmt.Fprint(buf, "\n")
+	copyComments(buf, val)
+	fmt.Fprintf(buf, "type %v struct {\n", strings.TrimPrefix(name.String(), "#"))
 
 	// Iterate through the fields of the struct
 	it, _ := val.Fields(cue.Optional(true))
