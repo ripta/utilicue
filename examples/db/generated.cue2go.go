@@ -4,6 +4,7 @@ package db
 
 type Title string
 
+// Identity is a record of a person's name.
 type Identity struct {
 	First  string
 	Middle string
@@ -11,9 +12,12 @@ type Identity struct {
 	Nick   *string
 }
 
+// Person is a record of a person.
 type Person struct {
 	Title string
 	Name  Identity
 	Age   int
 }
+
+// People is a list of person records.
 type People []Person
