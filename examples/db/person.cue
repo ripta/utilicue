@@ -1,15 +1,22 @@
 package db
 
+// Title is a record of a person's title.
+#Title: string
+
+// Identity is a record of a person's name.
 #Identity: {
 	First:  string
 	Middle: string
 	Last:   string
-	Nick:   string
+	Nick?:  string
 }
 
+// Person is a record of a person.
 #Person: {
-	Name: #Identity
-	Age:  int
+	Title: #Title
+	Name:  #Identity
+	Age:   int & >=0
 }
 
+// People is a list of person records.
 #People: [...#Person]
