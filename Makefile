@@ -1,3 +1,6 @@
 
 generate:
 	go generate -v ./examples/...
+
+test:
+	go test -v ./...
