@@ -1,5 +1,7 @@
 package db
 
+#Title: string
+
 #Identity: {
 	First:  string
 	Middle: string
@@ -8,8 +10,9 @@ package db
 }
 
 #Person: {
-	Name: #Identity
-	Age:  int
+	Title: #Title
+	Name:  #Identity
+	Age:   int
 }
 
 #People: [...#Person]
