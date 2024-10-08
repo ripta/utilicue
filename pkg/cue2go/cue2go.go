@@ -100,13 +100,18 @@ func (gen *Generator) Run(args []string) error {
 }
 
 func valueToGo(buf *bytes.Buffer, name cue.Selector, val cue.Value) {
+	ptr := ""
+	if name.ConstraintType()&cue.OptionalConstraint == cue.OptionalConstraint {
+		ptr = "*"
+	}
+
 	switch k := val.IncompleteKind(); k {
 	case cue.StringKind, cue.IntKind, cue.FloatKind, cue.BoolKind:
-		fmt.Fprintf(buf, "\t%v %v\n", name.Unquoted(), val.IncompleteKind())
+		fmt.Fprintf(buf, "\t%v %s%v\n", name.Unquoted(), ptr, val.IncompleteKind())
 
 	case cue.StructKind:
 		if _, i := val.ReferencePath(); len(i.Selectors()) > 0 {
-			fmt.Fprintf(buf, "\t%v %v\n", name.Unquoted(), strings.TrimPrefix(i.String(), "#"))
+			fmt.Fprintf(buf, "\t%v %s%v\n", name.Unquoted(), ptr, strings.TrimPrefix(i.String(), "#"))
 			return
 		}
 
