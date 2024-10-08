@@ -86,12 +86,18 @@ func (gen *Generator) Run(args []string) error {
 			valueToGo(buf, it.Selector(), v)
 		}
 
-		src, err := format.Source(buf.Bytes())
+		raw := buf.Bytes()
+
+		if err := os.WriteFile(filepath.Join(abs, "generated.cue2go.go"), raw, 0644); err != nil {
+			return fmt.Errorf("error writing output file: %w", err)
+		}
+
+		formatted, err := format.Source(raw)
 		if err != nil {
 			return fmt.Errorf("error formatting output: %w", err)
 		}
 
-		if err := os.WriteFile(filepath.Join(abs, "generated.cue2go.go"), src, 0644); err != nil {
+		if err := os.WriteFile(filepath.Join(abs, "generated.cue2go.go"), formatted, 0644); err != nil {
 			return fmt.Errorf("error writing output file: %w", err)
 		}
 	}
