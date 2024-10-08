@@ -2,11 +2,13 @@
 // Source: /Users/ripta/projects/utilicue/examples/db
 package db
 
+type Title string
+
 type Identity struct {
 	First  string
 	Middle string
 	Last   string
-	Nick   string
+	Nick   *string
 }
 
 type Person struct {
@@ -14,3 +16,4 @@ type Person struct {
 	Name  Identity
 	Age   int
 }
+type People []Person

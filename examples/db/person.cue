@@ -6,7 +6,7 @@ package db
 	First:  string
 	Middle: string
 	Last:   string
-	Nick:   string
+	Nick?:  string
 }
 
 #Person: {
