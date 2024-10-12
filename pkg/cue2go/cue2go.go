@@ -84,6 +84,7 @@ func (gen *Generator) Run(args []string) error {
 				continue
 			}
 
+			fmt.Fprint(buf, "type ")
 			valueToGo(buf, it.Selector(), v)
 		}
 
@@ -117,7 +118,7 @@ func valueToGo(buf *bytes.Buffer, name cue.Selector, val cue.Value) {
 	case cue.StringKind, cue.IntKind, cue.FloatKind, cue.BoolKind:
 		switch lt := name.LabelType(); lt {
 		case cue.DefinitionLabel:
-			fmt.Fprintf(buf, "type %v %v\n", strings.TrimPrefix(name.String(), "#"), val.IncompleteKind())
+			fmt.Fprintf(buf, "%v %v\n", strings.TrimPrefix(name.String(), "#"), val.IncompleteKind())
 		case cue.StringLabel:
 			fmt.Fprintf(buf, "\t%v %s%v\n", name.Unquoted(), ptr, val.IncompleteKind())
 		default:
@@ -137,9 +138,12 @@ func valueToGo(buf *bytes.Buffer, name cue.Selector, val cue.Value) {
 		if _, p := el.ReferencePath(); len(p.Selectors()) > 0 {
 			fmt.Fprint(buf, "\n")
 			copyComments(buf, val)
-			fmt.Fprintf(buf, "type %v []%v\n", strings.TrimPrefix(name.String(), "#"), strings.TrimPrefix(p.String(), "#"))
+			fmt.Fprintf(buf, "%v []%v\n", strings.TrimPrefix(name.String(), "#"), strings.TrimPrefix(p.String(), "#"))
 			return
 		}
+
+	case cue.TopKind:
+		fmt.Fprintf(buf, "%v any\n", strings.TrimPrefix(name.String(), "#"))
 
 	default:
 		panic(fmt.Sprintf("unsupported kind %v at path %v", k, val.Path().String()))
@@ -160,7 +164,7 @@ func copyComments(buf *bytes.Buffer, val cue.Value) {
 func structToType(buf *bytes.Buffer, name cue.Selector, val cue.Value) {
 	fmt.Fprint(buf, "\n")
 	copyComments(buf, val)
-	fmt.Fprintf(buf, "type %v struct {\n", strings.TrimPrefix(name.String(), "#"))
+	fmt.Fprintf(buf, "%v struct {\n", strings.TrimPrefix(name.String(), "#"))
 
 	// Iterate through the fields of the struct
 	it, _ := val.Fields(cue.Optional(true))
