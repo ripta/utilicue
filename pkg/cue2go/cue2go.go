@@ -84,8 +84,7 @@ func (gen *Generator) Run(args []string) error {
 				continue
 			}
 
-			fmt.Fprint(buf, "type ")
-			valueToGo(buf, it.Selector(), v)
+			valueToGo(buf, it.Selector(), v, true)
 		}
 
 		raw := buf.Bytes()
@@ -107,7 +106,7 @@ func (gen *Generator) Run(args []string) error {
 	return nil
 }
 
-func valueToGo(buf *bytes.Buffer, name cue.Selector, val cue.Value) {
+func valueToGo(buf *bytes.Buffer, name cue.Selector, val cue.Value, topLevel bool) {
 	ptr := ""
 	if name.ConstraintType()&cue.OptionalConstraint == cue.OptionalConstraint {
 		ptr = "*"
@@ -118,8 +117,14 @@ func valueToGo(buf *bytes.Buffer, name cue.Selector, val cue.Value) {
 	case cue.StringKind, cue.IntKind, cue.FloatKind, cue.BoolKind:
 		switch lt := name.LabelType(); lt {
 		case cue.DefinitionLabel:
+			if topLevel {
+				fmt.Fprint(buf, "type ")
+			}
 			fmt.Fprintf(buf, "%v %v\n", strings.TrimPrefix(name.String(), "#"), val.IncompleteKind())
 		case cue.StringLabel:
+			if topLevel {
+				fmt.Fprint(buf, "type ")
+			}
 			fmt.Fprintf(buf, "\t%v %s%v\n", name.Unquoted(), ptr, val.IncompleteKind())
 		default:
 			panic(fmt.Sprintf("unsupported label type %v at path %v", lt, name.String()))
@@ -131,13 +136,26 @@ func valueToGo(buf *bytes.Buffer, name cue.Selector, val cue.Value) {
 			return
 		}
 
-		structToType(buf, name, val)
+		structToType(buf, name, val, topLevel)
 
 	case cue.ListKind:
+		if _, p := val.ReferencePath(); len(p.Selectors()) > 0 {
+			fmt.Fprint(buf, "\n")
+			copyComments(buf, val)
+			if topLevel {
+				fmt.Fprint(buf, "type ")
+			}
+			fmt.Fprintf(buf, "%v %v\n", strings.TrimPrefix(name.Unquoted(), "#"), strings.TrimPrefix(p.String(), "#"))
+			return
+		}
+
 		el := val.LookupPath(cue.MakePath(cue.AnyIndex))
 		if _, p := el.ReferencePath(); len(p.Selectors()) > 0 {
 			fmt.Fprint(buf, "\n")
 			copyComments(buf, val)
+			if topLevel {
+				fmt.Fprint(buf, "type ")
+			}
 			fmt.Fprintf(buf, "%v []%v\n", strings.TrimPrefix(name.String(), "#"), strings.TrimPrefix(p.String(), "#"))
 			return
 		}
@@ -161,15 +179,18 @@ func copyComments(buf *bytes.Buffer, val cue.Value) {
 }
 
 // structToType prints the top-level fields of a struct value
-func structToType(buf *bytes.Buffer, name cue.Selector, val cue.Value) {
+func structToType(buf *bytes.Buffer, name cue.Selector, val cue.Value, topLevel bool) {
 	fmt.Fprint(buf, "\n")
 	copyComments(buf, val)
+	if topLevel {
+		fmt.Fprint(buf, "type ")
+	}
 	fmt.Fprintf(buf, "%v struct {\n", strings.TrimPrefix(name.String(), "#"))
 
 	// Iterate through the fields of the struct
 	it, _ := val.Fields(cue.Optional(true))
 	for it.Next() {
-		valueToGo(buf, it.Selector(), it.Value())
+		valueToGo(buf, it.Selector(), it.Value(), false)
 	}
 
 	fmt.Fprintf(buf, "}\n")
