@@ -17,6 +17,9 @@ type Person struct {
 	Title string
 	Name  Identity
 	Age   int
+	Attrs any
+
+	Children People
 }
 
 // People is a list of person records.

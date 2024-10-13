@@ -13,9 +13,11 @@ package db
 
 // Person is a record of a person.
 #Person: {
-	Title: #Title
-	Name:  #Identity
-	Age:   int & >=0
+	Title:    #Title
+	Name:     #Identity
+	Age:      int & >=0
+	Attrs:    _
+	Children: #People
 }
 
 // People is a list of person records.
