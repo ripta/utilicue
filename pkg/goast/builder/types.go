@@ -11,6 +11,8 @@ type Type struct {
 	expr    ast.Expr
 }
 
+var NoType = Type{}
+
 func NewType(name string) *Type {
 	return &Type{
 		name: name,
