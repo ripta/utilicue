@@ -103,8 +103,21 @@ func (gen *Generator) Run(args []string) error {
 
 func processValue(name cue.Selector, val cue.Value) (builder.Type, error) {
 	ptr := IsOptional(name)
+	kind := val.IncompleteKind()
 
-	switch k := val.IncompleteKind(); k {
+	// Top values are implicitly optional, but since we already treat them as
+	// `any` in Go, we don't want to add another indirection through pointers.
+	//
+	// However, in any other nullable case, do treat them as pointers, and then
+	// clear the null bit from the kind so that it does not get taken into account.
+	if kind != cue.TopKind {
+		if kind&cue.NullKind == cue.NullKind {
+			ptr = true
+			kind = kind &^ cue.NullKind
+		}
+	}
+
+	switch kind {
 
 	case cue.StringKind, cue.IntKind, cue.FloatKind, cue.BoolKind:
 		switch lt := name.LabelType(); lt {
@@ -148,10 +161,10 @@ func processValue(name cue.Selector, val cue.Value) (builder.Type, error) {
 		return builder.NewType(ident).WithComment(commentsFrom(val)).WithExpr(builder.NewIdent("any")), nil
 
 	case cue.BottomKind:
-		return builder.NoType, fmt.Errorf("unsupported kind %v resolves to _|_ at path %v", k, val.Path().String())
+		return builder.NoType, fmt.Errorf("unsupported kind %v resolves to _|_ at path %v", kind, val.Path().String())
 
 	default:
-		return builder.NoType, fmt.Errorf("unsupported kind %v at path %v", k, val.Path().String())
+		return builder.NoType, fmt.Errorf("unsupported kind %v at path %v", kind, val.Path().String())
 	}
 
 	return builder.NoType, errors.New("unreachable")
