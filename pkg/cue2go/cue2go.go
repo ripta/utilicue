@@ -194,6 +194,16 @@ func commentsFrom(val cue.Value) string {
 		}
 	}
 
+	pos := val.Pos()
+	file := pos.Filename()
+	if cwd, err := os.Getwd(); err == nil {
+		file = strings.TrimPrefix(file, cwd+"/")
+	} else {
+		file = filepath.Base(file)
+	}
+
+	fmt.Fprintf(buf, "\n\nSource: %s:%d:%d", file, pos.Line(), pos.Column())
+
 	return buf.String()
 }
 
