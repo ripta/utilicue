@@ -154,6 +154,25 @@ func (gen *Generator) processValue(name cue.Selector, val cue.Value) (builder.Ty
 
 	case cue.StructKind:
 		if _, p := val.ReferencePath(); len(p.Selectors()) > 0 {
+			fmt.Printf("List of:\n")
+			for _, s := range p.Selectors() {
+				vo, ve := val.Expr()
+				fmt.Printf(" - %v(%d) %q\n", vo, vo, s.String())
+				for i, v := range ve {
+					fmt.Printf("   - %d: %T: %#v\n", i, v, v)
+					fmt.Printf("     >> source: %+v\n", v.Source())
+					//vqr, vqp := v.ReferencePath()
+					//fmt.Printf(".    >> vqr=%+v vqp=%+v\n", vqr, vqp)
+					//bs, _ := json.Marshal(v)
+					//fmt.Printf("     >> %+v\n", string(bs))
+					fmt.Printf("     >> misc: %+v\n", v)
+				}
+			}
+
+			// fmt.Printf("TEST: %v\n", root.LookupPath(p))
+			// r, _ := json.MarshalIndent(root.LookupPath(p), "", "  ")
+			// fmt.Printf("ROOT: %s\n", r)
+
 			ident := name.Unquoted()
 			expr := builder.NewIdent(gen.toIdent(p.String())).WithPtr(ptr)
 			return builder.NewType(ident).WithExpr(expr), nil
@@ -249,7 +268,7 @@ func (gen *Generator) processStruct(name cue.Selector, val cue.Value) (builder.T
 	expr := builder.NewStruct()
 
 	// Iterate through the fields of the struct
-	it, _ := val.Fields(cue.Optional(true))
+	it, _ := val.Fields(cue.Optional(true), cue.InlineImports(true))
 	for it.Next() {
 		field, err := gen.processValue(it.Selector(), it.Value())
 		if err != nil {
