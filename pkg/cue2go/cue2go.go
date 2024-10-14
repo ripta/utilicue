@@ -163,6 +163,9 @@ func valueToGo(buf *bytes.Buffer, name cue.Selector, val cue.Value, topLevel boo
 	case cue.TopKind:
 		fmt.Fprintf(buf, "%v any\n", strings.TrimPrefix(name.String(), "#"))
 
+	case cue.BottomKind:
+		panic(fmt.Sprintf("unsupported kind %v resolves to _|_ at path %v", k, val.Path().String()))
+
 	default:
 		panic(fmt.Sprintf("unsupported kind %v at path %v", k, val.Path().String()))
 	}
