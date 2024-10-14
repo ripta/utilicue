@@ -2,6 +2,7 @@ package cue2go
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"go/format"
@@ -153,7 +154,16 @@ func (gen *Generator) processValue(name cue.Selector, val cue.Value) (builder.Ty
 		}
 
 	case cue.StructKind:
-		if _, p := val.ReferencePath(); len(p.Selectors()) > 0 {
+		if root, p := val.ReferencePath(); len(p.Selectors()) > 0 {
+			fmt.Printf("List of:\n")
+			for _, s := range p.Selectors() {
+				fmt.Printf(" - %q\n", s.String())
+			}
+
+			fmt.Printf("TEST: %v\n", root.LookupPath(p))
+			r, _ := json.MarshalIndent(root.LookupPath(p), "", "  ")
+			fmt.Printf("ROOT: %s\n", r)
+
 			ident := name.Unquoted()
 			expr := builder.NewIdent(gen.toIdent(p.String())).WithPtr(ptr)
 			return builder.NewType(ident).WithExpr(expr), nil
