@@ -158,12 +158,12 @@ func processValue(name cue.Selector, val cue.Value) (builder.Type, error) {
 		if el.Exists() {
 			if _, p := el.ReferencePath(); len(p.Selectors()) > 0 {
 				ident := strings.TrimSuffix(strings.TrimPrefix(name.String(), "#"), "?")
-				expr := builder.NewIdent("[]" + strings.TrimPrefix(p.String(), "#")).WithPtr(ptr)
+				expr := builder.NewIdent("[]" + strings.TrimPrefix(p.String(), "#"))
 				return builder.NewType(ident).WithComment(commentsFrom(val)).WithExpr(expr), nil
 			}
 
 			ident := strings.TrimSuffix(strings.TrimPrefix(name.String(), "#"), "?")
-			expr := builder.NewIdent("[]" + el.IncompleteKind().String()).WithPtr(ptr)
+			expr := builder.NewIdent("[]" + el.IncompleteKind().String())
 			return builder.NewType(ident).WithComment(commentsFrom(val)).WithExpr(expr), nil
 		}
 
