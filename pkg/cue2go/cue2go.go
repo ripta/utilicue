@@ -123,11 +123,11 @@ func processValue(name cue.Selector, val cue.Value) (builder.Type, error) {
 		switch lt := name.LabelType(); lt {
 		case cue.DefinitionLabel:
 			ident := strings.TrimPrefix(name.String(), "#")
-			expr := builder.FromKind(val.IncompleteKind()).WithPtr(ptr)
+			expr := builder.FromKind(kind).WithPtr(ptr)
 			return builder.NewType(ident).WithExpr(expr), nil
 		case cue.StringLabel:
 			ident := name.Unquoted()
-			expr := builder.FromKind(val.IncompleteKind()).WithPtr(ptr)
+			expr := builder.FromKind(kind).WithPtr(ptr)
 			return builder.NewType(ident).WithExpr(expr), nil
 		default:
 			return builder.NoType, fmt.Errorf("unsupported label type %v at path %v", lt, name.String())
@@ -140,7 +140,12 @@ func processValue(name cue.Selector, val cue.Value) (builder.Type, error) {
 			return builder.NewType(ident).WithExpr(expr), nil
 		}
 
-		return processStruct(name, val)
+		t, err := processStruct(name, val)
+		if err != nil {
+			return builder.NoType, fmt.Errorf("error processing struct %v: %w", name, err)
+		}
+
+		return t, nil
 
 	case cue.ListKind:
 		if _, p := val.ReferencePath(); len(p.Selectors()) > 0 {
@@ -150,14 +155,22 @@ func processValue(name cue.Selector, val cue.Value) (builder.Type, error) {
 		}
 
 		el := val.LookupPath(cue.MakePath(cue.AnyIndex))
-		if _, p := el.ReferencePath(); len(p.Selectors()) > 0 {
-			ident := strings.TrimPrefix(name.String(), "#")
-			expr := builder.NewIdent("[]" + strings.TrimPrefix(p.String(), "#")).WithPtr(ptr)
+		if el.Exists() {
+			if _, p := el.ReferencePath(); len(p.Selectors()) > 0 {
+				ident := strings.TrimSuffix(strings.TrimPrefix(name.String(), "#"), "?")
+				expr := builder.NewIdent("[]" + strings.TrimPrefix(p.String(), "#")).WithPtr(ptr)
+				return builder.NewType(ident).WithComment(commentsFrom(val)).WithExpr(expr), nil
+			}
+
+			ident := strings.TrimSuffix(strings.TrimPrefix(name.String(), "#"), "?")
+			expr := builder.NewIdent("[]" + el.IncompleteKind().String()).WithPtr(ptr)
 			return builder.NewType(ident).WithComment(commentsFrom(val)).WithExpr(expr), nil
 		}
 
+		return processList(name, val)
+
 	case cue.TopKind:
-		ident := strings.TrimPrefix(name.String(), "#")
+		ident := strings.TrimSuffix(strings.TrimPrefix(name.String(), "#"), "?")
 		return builder.NewType(ident).WithComment(commentsFrom(val)).WithExpr(builder.NewIdent("any")), nil
 
 	case cue.BottomKind:
@@ -184,9 +197,13 @@ func commentsFrom(val cue.Value) string {
 	return buf.String()
 }
 
+func processList(name cue.Selector, val cue.Value) (builder.Type, error) {
+	return builder.NoType, errors.New("unimplemented")
+}
+
 // processStruct prints the top-level fields of a struct value
 func processStruct(name cue.Selector, val cue.Value) (builder.Type, error) {
-	ident := strings.TrimPrefix(name.String(), "#")
+	ident := strings.TrimSuffix(strings.TrimPrefix(name.String(), "#"), "?")
 	expr := builder.NewStruct()
 
 	// Iterate through the fields of the struct
