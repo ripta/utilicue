@@ -198,3 +198,16 @@ func structToType(buf *bytes.Buffer, name cue.Selector, val cue.Value, topLevel 
 
 	fmt.Fprintf(buf, "}\n")
 }
+
+func IsOptional(sel cue.Selector) bool {
+	sel.Optional()
+	return sel.ConstraintType()&cue.OptionalConstraint == cue.OptionalConstraint
+}
+
+func IsRequired(sel cue.Selector) bool {
+	return sel.ConstraintType()&cue.RequiredConstraint == cue.RequiredConstraint
+}
+
+func IsPattern(sel cue.Selector) bool {
+	return sel.ConstraintType()&cue.PatternConstraint == cue.PatternConstraint
+}
