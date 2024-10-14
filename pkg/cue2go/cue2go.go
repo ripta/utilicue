@@ -140,6 +140,19 @@ func processValue(name cue.Selector, val cue.Value) (builder.Type, error) {
 			return builder.NewType(ident).WithExpr(expr), nil
 		}
 
+		el := val.LookupPath(cue.MakePath(cue.AnyString))
+		if el.Exists() {
+			if _, p := el.ReferencePath(); len(p.Selectors()) > 0 {
+				ident := strings.TrimSuffix(strings.TrimPrefix(name.String(), "#"), "?")
+				expr := builder.NewIdent("map[string]" + strings.TrimPrefix(p.String(), "#"))
+				return builder.NewType(ident).WithExpr(expr), nil
+			}
+
+			ident := strings.TrimSuffix(strings.TrimPrefix(name.String(), "#"), "?")
+			expr := builder.NewIdent("map[string]" + el.IncompleteKind().String())
+			return builder.NewType(ident).WithExpr(expr), nil
+		}
+
 		t, err := processStruct(name, val)
 		if err != nil {
 			return builder.NoType, fmt.Errorf("error processing struct %v: %w", name, err)
