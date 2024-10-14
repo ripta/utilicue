@@ -14,11 +14,10 @@ type Identity struct {
 
 // Person is a record of a person.
 type Person struct {
-	Title string
-	Name  Identity
-	Age   int
-	Attrs any
-
+	Title    string
+	Name     Identity
+	Age      int
+	Attrs    any
 	Children People
 }
 
