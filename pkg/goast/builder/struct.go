@@ -1,6 +1,8 @@
 package builder
 
-import "go/ast"
+import (
+	"go/ast"
+)
 
 type Struct struct {
 	fields []*ast.Field
@@ -16,10 +18,6 @@ func (s Struct) AddField(f Fielder) Struct {
 }
 
 func (s Struct) AsExpr() ast.Expr {
-	if len(s.fields) == 0 {
-		return nil
-	}
-
 	return &ast.StructType{
 		Fields: &ast.FieldList{
 			List: s.fields,
