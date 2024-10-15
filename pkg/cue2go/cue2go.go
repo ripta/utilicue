@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/ripta/utilicue/pkg/goast/builder"
 	"go/format"
 	"go/token"
 	"io/fs"
@@ -12,13 +11,33 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
 	"cuelang.org/go/cue/load"
+	"github.com/ripta/utilicue/pkg/goast/builder"
 )
 
 type Generator struct {
+	ExportMode ExportModeFlag
+}
+
+func (gen *Generator) toIdent(name string) string {
+	name = strings.TrimPrefix(name, "#")
+	name = strings.TrimSuffix(name, "?")
+
+	if gen.ExportMode == ExportModeRespectSource {
+		return name
+	}
+
+	first, size := utf8.DecodeRuneInString(name)
+	if first == utf8.RuneError {
+		panic("invalid UTF-8 string in name: " + name)
+	}
+
+	return string(unicode.ToUpper(first)) + name[size:]
 }
 
 func (gen *Generator) Run(args []string) error {
@@ -69,7 +88,7 @@ func (gen *Generator) Run(args []string) error {
 			log.Fatal(err)
 		}
 
-		pkg, err := processTopLevel(builder.NewFile(filepath.Base(abs)), v)
+		pkg, err := gen.processTopLevel(builder.NewFile(filepath.Base(abs)), v)
 		if err != nil {
 			return fmt.Errorf("error generating Go code: %w", err)
 		}
@@ -101,7 +120,7 @@ func (gen *Generator) Run(args []string) error {
 	return nil
 }
 
-func processValue(name cue.Selector, val cue.Value) (builder.Type, error) {
+func (gen *Generator) processValue(name cue.Selector, val cue.Value) (builder.Type, error) {
 	ptr := IsOptional(name)
 	kind := val.IncompleteKind()
 
@@ -122,11 +141,11 @@ func processValue(name cue.Selector, val cue.Value) (builder.Type, error) {
 	case cue.StringKind, cue.IntKind, cue.FloatKind, cue.BoolKind:
 		switch lt := name.LabelType(); lt {
 		case cue.DefinitionLabel:
-			ident := strings.TrimPrefix(name.String(), "#")
+			ident := gen.toIdent(name.String())
 			expr := builder.FromKind(kind).WithPtr(ptr)
 			return builder.NewType(ident).WithExpr(expr), nil
 		case cue.StringLabel:
-			ident := name.Unquoted()
+			ident := gen.toIdent(name.Unquoted())
 			expr := builder.FromKind(kind).WithPtr(ptr)
 			return builder.NewType(ident).WithExpr(expr), nil
 		default:
@@ -136,24 +155,24 @@ func processValue(name cue.Selector, val cue.Value) (builder.Type, error) {
 	case cue.StructKind:
 		if _, p := val.ReferencePath(); len(p.Selectors()) > 0 {
 			ident := name.Unquoted()
-			expr := builder.NewIdent(strings.TrimPrefix(p.String(), "#")).WithPtr(ptr)
+			expr := builder.NewIdent(gen.toIdent(p.String())).WithPtr(ptr)
 			return builder.NewType(ident).WithExpr(expr), nil
 		}
 
 		el := val.LookupPath(cue.MakePath(cue.AnyString))
 		if el.Exists() {
 			if _, p := el.ReferencePath(); len(p.Selectors()) > 0 {
-				ident := strings.TrimSuffix(strings.TrimPrefix(name.String(), "#"), "?")
-				expr := builder.NewIdent("map[string]" + strings.TrimPrefix(p.String(), "#"))
+				ident := gen.toIdent(name.String())
+				expr := builder.NewIdent("map[string]" + gen.toIdent(p.String()))
 				return builder.NewType(ident).WithExpr(expr), nil
 			}
 
-			ident := strings.TrimSuffix(strings.TrimPrefix(name.String(), "#"), "?")
+			ident := gen.toIdent(name.String())
 			expr := builder.NewIdent("map[string]" + el.IncompleteKind().String())
 			return builder.NewType(ident).WithExpr(expr), nil
 		}
 
-		t, err := processStruct(name, val)
+		t, err := gen.processStruct(name, val)
 		if err != nil {
 			return builder.NoType, fmt.Errorf("error processing struct %v: %w", name, err)
 		}
@@ -162,29 +181,29 @@ func processValue(name cue.Selector, val cue.Value) (builder.Type, error) {
 
 	case cue.ListKind:
 		if _, p := val.ReferencePath(); len(p.Selectors()) > 0 {
-			ident := strings.TrimPrefix(name.Unquoted(), "#")
-			expr := builder.NewIdent(strings.TrimPrefix(p.String(), "#"))
-			return builder.NewType(ident).WithComment(commentsFrom(val)).WithExpr(expr), nil
+			ident := gen.toIdent(name.Unquoted())
+			expr := builder.NewIdent(gen.toIdent(p.String()))
+			return builder.NewType(ident).WithComment(gen.commentsFrom(val)).WithExpr(expr), nil
 		}
 
 		el := val.LookupPath(cue.MakePath(cue.AnyIndex))
 		if el.Exists() {
 			if _, p := el.ReferencePath(); len(p.Selectors()) > 0 {
-				ident := strings.TrimSuffix(strings.TrimPrefix(name.String(), "#"), "?")
-				expr := builder.NewIdent("[]" + strings.TrimPrefix(p.String(), "#"))
-				return builder.NewType(ident).WithComment(commentsFrom(val)).WithExpr(expr), nil
+				ident := gen.toIdent(name.String())
+				expr := builder.NewIdent("[]" + gen.toIdent(p.String()))
+				return builder.NewType(ident).WithComment(gen.commentsFrom(val)).WithExpr(expr), nil
 			}
 
-			ident := strings.TrimSuffix(strings.TrimPrefix(name.String(), "#"), "?")
+			ident := gen.toIdent(name.String())
 			expr := builder.NewIdent("[]" + el.IncompleteKind().String())
-			return builder.NewType(ident).WithComment(commentsFrom(val)).WithExpr(expr), nil
+			return builder.NewType(ident).WithComment(gen.commentsFrom(val)).WithExpr(expr), nil
 		}
 
-		return processList(name, val)
+		return gen.processList(name, val)
 
 	case cue.TopKind:
-		ident := strings.TrimSuffix(strings.TrimPrefix(name.String(), "#"), "?")
-		return builder.NewType(ident).WithComment(commentsFrom(val)).WithExpr(builder.NewIdent("any")), nil
+		ident := gen.toIdent(name.String())
+		return builder.NewType(ident).WithComment(gen.commentsFrom(val)).WithExpr(builder.NewIdent("any")), nil
 
 	case cue.BottomKind:
 		return builder.NoType, fmt.Errorf("unsupported kind %v resolves to _|_ at path %v", kind, val.Path().String())
@@ -196,7 +215,7 @@ func processValue(name cue.Selector, val cue.Value) (builder.Type, error) {
 	return builder.NoType, errors.New("unreachable")
 }
 
-func commentsFrom(val cue.Value) string {
+func (gen *Generator) commentsFrom(val cue.Value) string {
 	buf := &bytes.Buffer{}
 	if cgs := val.Doc(); len(cgs) > 0 {
 		for _, cg := range cgs {
@@ -220,19 +239,19 @@ func commentsFrom(val cue.Value) string {
 	return buf.String()
 }
 
-func processList(name cue.Selector, val cue.Value) (builder.Type, error) {
+func (gen *Generator) processList(name cue.Selector, val cue.Value) (builder.Type, error) {
 	return builder.NoType, errors.New("unimplemented")
 }
 
 // processStruct prints the top-level fields of a struct value
-func processStruct(name cue.Selector, val cue.Value) (builder.Type, error) {
-	ident := strings.TrimSuffix(strings.TrimPrefix(name.String(), "#"), "?")
+func (gen *Generator) processStruct(name cue.Selector, val cue.Value) (builder.Type, error) {
+	ident := gen.toIdent(name.String())
 	expr := builder.NewStruct()
 
 	// Iterate through the fields of the struct
 	it, _ := val.Fields(cue.Optional(true))
 	for it.Next() {
-		field, err := processValue(it.Selector(), it.Value())
+		field, err := gen.processValue(it.Selector(), it.Value())
 		if err != nil {
 			return builder.NoType, fmt.Errorf("error processing field %v: %w", it.Selector(), err)
 		}
@@ -240,10 +259,10 @@ func processStruct(name cue.Selector, val cue.Value) (builder.Type, error) {
 		expr = expr.AddField(field)
 	}
 
-	return builder.NewType(ident).WithComment(commentsFrom(val)).WithExpr(expr), nil
+	return builder.NewType(ident).WithComment(gen.commentsFrom(val)).WithExpr(expr), nil
 }
 
-func processTopLevel(pkg builder.File, val cue.Value) (builder.File, error) {
+func (gen *Generator) processTopLevel(pkg builder.File, val cue.Value) (builder.File, error) {
 	it, err := val.Fields(cue.Definitions(true))
 	if err != nil {
 		return pkg, fmt.Errorf("error iterating over definitions: %w", err)
@@ -255,7 +274,7 @@ func processTopLevel(pkg builder.File, val cue.Value) (builder.File, error) {
 			continue
 		}
 
-		decl, err := processValue(it.Selector(), v)
+		decl, err := gen.processValue(it.Selector(), v)
 		if err != nil {
 			return pkg, err
 		}

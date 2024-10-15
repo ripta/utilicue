@@ -1,4 +1,4 @@
-//go:generate go run ../../cmd/cue2go .
+//go:generate go run ../../cmd/cue2go -e all .
 package kube_deployment
 
 import (

@@ -8,6 +8,7 @@ require (
 	cuelang.org/go v0.9.2
 	github.com/mitchellh/go-wordwrap v1.0.1
 	github.com/spf13/cobra v1.8.1
+	github.com/thediveo/enumflag v0.10.1
 	k8s.io/api v0.31.1
 	k8s.io/apimachinery v0.31.1
 )
